@@ -1,0 +1,123 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<head profile="http://gmpg.org/xfn/11">
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<title>Import XLS</title>
+</head>
+<body>
+<h3>Select Excel file</h3>
+<form name="frmload" method="post" action="" enctype="multipart/form-data">
+  <input type="file" name="file" /> &nbsp; &nbsp; &nbsp; <input type="submit" value="----- IMPORT -----" />
+</form>
+
+<?php 
+
+$link = mysql_connect('localhost', 'USER_DB', 'PASS_DB');
+if (!$link) {
+    die('Could not connect: ' . mysql_error());
+}
+
+mysql_select_db("DB",$link);
+
+
+	if(isset($_FILES['file']) && $_FILES['file']['name'] != '')
+	{
+		require_once 'reader/Classes/PHPExcel/IOFactory.php';
+
+		//Funciones extras
+		function get_cell($cell, $objPHPExcel){
+			//select one cell
+			$objCell = ($objPHPExcel->getActiveSheet()->getCell($cell));
+			//get cell value
+			return $objCell->getvalue();
+		}
+		
+		function pp(&$var){
+			$var = chr(ord($var)+1);
+			return true;
+		}
+		
+		$name	  = $_FILES['file']['name'];
+		$tname 	  = $_FILES['file']['tmp_name'];
+		$type 	  = $_FILES['file']['type'];
+		
+    
+    //check extension
+		if($type == 'application/vnd.ms-excel')
+		{
+			// Extension excel 97
+			$ext = 'xls';
+		}
+		else if($type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+		{
+			// Extension excel 2007 and 2010
+			$ext = 'xlsx';
+		}else{
+			// Extension not valid
+			echo -1;
+			exit();
+		}
+	
+		$xlsx = 'Excel2007';
+		$xls  = 'Excel5';
+
+		//creando el lector
+		$objReader = PHPExcel_IOFactory::createReader($$ext);
+		
+		//cargamos el archivo
+		$objPHPExcel = $objReader->load($tname);
+	
+		$dim = $objPHPExcel->getActiveSheet()->calculateWorksheetDimension();
+	
+		// list coloca en array $start y $end
+		list($start, $end) = explode(':', $dim);
+			
+		if(!preg_match('#([A-Z]+)([0-9]+)#', $start, $rslt)){
+			return false;
+		}
+		
+		list($start, $start_h, $start_v) = $rslt;
+		if(!preg_match('#([A-Z]+)([0-9]+)#', $end, $rslt)){
+			return false;
+		}
+		
+		list($end, $end_h, $end_v) = $rslt;
+		
+		$tmp = array();
+		$results = array();
+		
+		$row = 1;
+		$lastColumn = $objPHPExcel->getActiveSheet()->getHighestColumn();
+		$lastColumn++;
+		for ($column = 'A'; $column != $lastColumn; $column++) {
+			$cell = trim(get_cell($column.$row, $objPHPExcel));
+			$tmp[] = $cell;
+		}
+		
+		$results[] = $tmp;
+	
+		for($v=1; $v<=$end_v; $v++)
+		{
+			$tmp = array();
+			
+			$lastColumn = $objPHPExcel->getActiveSheet()->getHighestColumn();
+			$lastColumn++;
+			for ($column = 'A'; $column != $lastColumn; $column++) {
+				$cell = trim(get_cell($column.$v, $objPHPExcel));
+				$tmp[] = str_replace("'",'',$cell);
+			}
+			
+			//watch your import
+			echo $tmp[0].'-'.$tmp[1].'<br />';
+			
+			//EDIT YOUR INSERT
+			$sql="INSERT INTO `cewar_db`.`crm_import_01` (`1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`, `9`, `10`) 
+			VALUES ('".$tmp[0]."','".$tmp[1]."', '".$tmp[2]."', '".$tmp[3]."', '".$tmp[4]."', '".$tmp[5]."', '".$tmp[6]."', '".$tmp[7]."', '".$tmp[8]."', '".$tmp[9]."', '".$tmp[10]."');";
+			
+			//INSERT INTO DB
+			mysql_query($sql);
+
+		}			
+	}
+?>
+</body>
+</html>
